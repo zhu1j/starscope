@@ -139,6 +139,37 @@ canvas { display: block; }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
+/* 语言选择器 ------------------------------------------------------------ */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.lang-switch:hover { border-color: rgba(150, 175, 255, 0.5); color: var(--text); }
+.lang-switch:focus-within { border-color: var(--accent); color: var(--text); }
+.lang-icon { font-size: 13px; line-height: 1; }
+.lang-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 2px 2px 2px 0;
+  cursor: pointer;
+  outline: none;
+}
+.lang-select option { background: #0a0d1e; color: var(--text); }
+
 /* 按钮 ------------------------------------------------------------------- */
 .btn {
   display: inline-flex;
