@@ -33,10 +33,14 @@
         <circle cx="5" cy="22" r="1.5" fill="#63e6be"/>
       </svg>
       <span>Starscope</span>
-      <span class="brand-sub">GitHub 星象图</span>
+      <span class="brand-sub" data-i18n="brandSub">GitHub 星象图</span>
     </a>
     <div class="topbar-actions">
-      <button class="btn btn-ghost btn-sm" id="settings-btn" type="button">Token 设置</button>
+      <label class="lang-switch" title="Language">
+        <span class="lang-icon" aria-hidden="true">🌐</span>
+        <select class="lang-select" id="lang-select" aria-label="Language"></select>
+      </label>
+      <button class="btn btn-ghost btn-sm" id="settings-btn" type="button" data-i18n="settingsBtn">Token 设置</button>
     </div>
   </header>
 
@@ -45,11 +49,11 @@
     <!-- ============ 首屏 ============ -->
     <section class="view" id="view-intro">
       <div class="intro">
-        <span class="intro-eyebrow"><i class="dot"></i>读取公开星标 · 无需登录</span>
+        <span class="intro-eyebrow"><i class="dot"></i><span data-i18n="eyebrow">读取公开星标 · 无需登录</span></span>
 
-        <h1>你的 <span class="accent-text">GitHub 星象图</span></h1>
+        <h1><span data-i18n="heroTitlePre">你的</span> <span class="accent-text" data-i18n="heroAccent">GitHub 星象图</span></h1>
 
-        <p class="intro-lede">
+        <p class="intro-lede" data-i18n="lede">
           输入一个 GitHub 用户名，我们会读取他公开星标过的仓库，
           按技术方向聚成星座，画成一张专属星图——顺便告诉你，
           你的技术品味到底长什么样。
@@ -59,30 +63,30 @@
           <span class="search-prefix" aria-hidden="true">github.com/</span>
           <input class="search-input" id="search-input" type="text"
                  placeholder="输入 GitHub 用户名，按 / 快速聚焦"
+                 data-i18n-ph="searchPlaceholder"
                  aria-label="GitHub 用户名" spellcheck="false">
-          <button class="btn btn-primary" type="submit">探索星图</button>
+          <button class="btn btn-primary" type="submit" data-i18n="exploreBtn">探索星图</button>
         </form>
 
         <p class="intro-hint">
-          不想查人？<button class="link-btn" id="demo-btn" type="button">进入演示模式</button>
-          ，直接看一个示例的星象图长什么样。
+          <span data-i18n="hintPre">不想查人？</span><button class="link-btn" id="demo-btn" type="button" data-i18n="demoLink">进入演示模式</button><span data-i18n="hintPost">，直接看一个示例的星象图长什么样。</span>
         </p>
 
         <div class="intro-features">
           <div class="feature">
-            <div class="feature-k">01 / 星座</div>
-            <h3>按方向聚星</h3>
-            <p>依据仓库的语言与标签，把星标自动归入 AI、前端、底层、云端等星座。</p>
+            <div class="feature-k" data-i18n="feat1k">01 / 星座</div>
+            <h3 data-i18n="feat1h">按方向聚星</h3>
+            <p data-i18n="feat1p">依据仓库的语言与标签，把星标自动归入 AI、前端、底层、云端等星座。</p>
           </div>
           <div class="feature">
-            <div class="feature-k">02 / 名片</div>
-            <h3>读懂技术品味</h3>
-            <p>语言分布、星标总数、集中度指数与技术灵魂标签，一屏看清你的偏好。</p>
+            <div class="feature-k" data-i18n="feat2k">02 / 名片</div>
+            <h3 data-i18n="feat2h">读懂技术品味</h3>
+            <p data-i18n="feat2p">语言分布、星标总数、集中度指数与技术灵魂标签，一屏看清你的偏好。</p>
           </div>
           <div class="feature">
-            <div class="feature-k">03 / 分享</div>
-            <h3>一键生成卡片</h3>
-            <p>导出 1200×630 分享图，直接发到社交平台，让朋友也来测一测。按 <span class="kbd">/</span> 聚焦输入框。</p>
+            <div class="feature-k" data-i18n="feat3k">03 / 分享</div>
+            <h3 data-i18n="feat3h">一键生成卡片</h3>
+            <p><span data-i18n="feat3pPre">导出 1200×630 分享图，直接发到社交平台，让朋友也来测一测。按</span> <span class="kbd">/</span> <span data-i18n="feat3pPost">聚焦输入框。</span></p>
           </div>
         </div>
       </div>
@@ -107,11 +111,11 @@
     <!-- ============ 错误态 ============ -->
     <section class="view" id="view-error" hidden>
       <div class="error-card">
-        <h2 id="error-title">出了一点小问题</h2>
+        <h2 id="error-title" data-i18n="errTitle">出了一点小问题</h2>
         <p id="error-body"></p>
         <p class="error-detail" id="error-detail"></p>
-        <button class="btn btn-primary" id="error-retry-btn" type="button">重试</button>
-        <button class="btn btn-ghost" id="error-demo-btn" type="button">进入演示模式</button>
+        <button class="btn btn-primary" id="error-retry-btn" type="button" data-i18n="retryBtn">重试</button>
+        <button class="btn btn-ghost" id="error-demo-btn" type="button" data-i18n="errDemoBtn">进入演示模式</button>
       </div>
     </section>
 
@@ -124,7 +128,7 @@
           <h2 class="result-name">
             <span id="result-name">—</span>
             <a class="result-login" id="result-login" href="#" target="_blank" rel="noopener">@—</a>
-            <span class="badge-demo" id="badge-demo" hidden>演示数据</span>
+            <span class="badge-demo" id="badge-demo" hidden data-i18n="demoBadge">演示数据</span>
           </h2>
           <p class="result-bio" id="result-bio"></p>
           <div class="result-meta" id="result-meta"></div>
@@ -133,9 +137,9 @@
 
       <div class="starmap-card">
         <div class="starmap-head">
-          <div class="starmap-title">星标星图 <span id="starmap-title-user"></span></div>
+          <div class="starmap-title"><span data-i18n="starmapTitle">星标星图</span> <span id="starmap-title-user"></span></div>
           <div class="starmap-scale">
-            <span>星点大小 = 仓库热度 · 点击图例或星座可筛选</span>
+            <span data-i18n="starmapScale">星点大小 = 仓库热度 · 点击图例或星座可筛选</span>
             <span class="scale-dots" aria-hidden="true">
               <i style="width:4px;height:4px"></i>
               <i style="width:7px;height:7px"></i>
@@ -155,23 +159,23 @@
       </div>
 
       <div class="section-title">
-        <h2>技术名片</h2>
-        <span>基于你公开星标的静态统计</span>
+        <h2 data-i18n="resultTitle">技术名片</h2>
+        <span data-i18n="resultSub">基于你公开星标的静态统计</span>
       </div>
 
       <div class="grid-cards">
         <div class="card">
-          <div class="card-label">星标总量</div>
+          <div class="card-label" data-i18n="cardCount">星标总量</div>
           <div class="stat-value num"><span id="stat-count">0</span></div>
           <div class="stat-note" id="stat-count-note"></div>
         </div>
         <div class="card">
-          <div class="card-label">累计星数</div>
+          <div class="card-label" data-i18n="cardStars">累计星数</div>
           <div class="stat-value num"><span id="stat-stars">0</span></div>
           <div class="stat-note" id="stat-stars-note"></div>
         </div>
         <div class="card">
-          <div class="card-label">品味集中度</div>
+          <div class="card-label" data-i18n="cardFocus">品味集中度</div>
           <div class="stat-value num"><span id="stat-focus">0</span><span class="stat-unit">/100</span></div>
           <div class="stat-note" id="stat-focus-note"></div>
         </div>
@@ -179,38 +183,38 @@
 
       <div class="two-col" style="margin-top:14px">
         <div class="card">
-          <div class="card-label">语言分布</div>
+          <div class="card-label" data-i18n="langDist">语言分布</div>
           <div class="lang-list" id="lang-list" style="margin-top:14px"></div>
         </div>
         <div class="card">
-          <div class="card-label">星座构成</div>
+          <div class="card-label" data-i18n="catComp">星座构成</div>
           <div class="cat-list" id="cat-list" style="margin-top:14px"></div>
         </div>
       </div>
 
       <div class="two-col" style="margin-top:14px">
         <div class="gem-card">
-          <div class="gem-tag">意外宝藏 · 被你发现的冷门星</div>
+          <div class="gem-tag" data-i18n="gemTag">意外宝藏 · 被你发现的冷门星</div>
           <div class="gem-name" id="gem-name">—</div>
           <div class="gem-desc" id="gem-desc"></div>
           <div class="gem-foot" id="gem-foot"></div>
         </div>
         <div class="soul-card">
-          <div class="soul-tag">技术灵魂</div>
+          <div class="soul-tag" data-i18n="soulTag">技术灵魂</div>
           <div class="soul-name" id="soul-name">—</div>
           <div class="soul-desc" id="soul-desc"></div>
           <div class="soul-meter">
-            <div class="soul-meter-top"><span>品味集中度</span><span>0 / 100</span></div>
+            <div class="soul-meter-top"><span data-i18n="focusLabel">品味集中度</span><span>0 / 100</span></div>
             <div class="soul-track"><div class="soul-fill" style="width:0%"></div></div>
           </div>
         </div>
       </div>
 
       <div class="result-actions">
-        <button class="btn btn-primary" id="share-btn" type="button">生成分享卡片</button>
-        <a class="btn btn-ghost" id="result-link" href="#" target="_blank" rel="noopener">打开 GitHub 主页</a>
-        <button class="btn btn-ghost" id="copy-link-btn" type="button">复制分享链接</button>
-        <button class="btn btn-ghost" id="again-btn" type="button">查别人</button>
+        <button class="btn btn-primary" id="share-btn" type="button" data-i18n="shareBtn">生成分享卡片</button>
+        <a class="btn btn-ghost" id="result-link" href="#" target="_blank" rel="noopener" data-i18n="openGh">打开 GitHub 主页</a>
+        <button class="btn btn-ghost" id="copy-link-btn" type="button" data-i18n="copyLink">复制分享链接</button>
+        <button class="btn btn-ghost" id="again-btn" type="button" data-i18n="againBtn">查别人</button>
       </div>
 
     </section>
@@ -219,8 +223,8 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>Starscope · 依据 GitHub 公开数据绘制，星标统计为静态快照。</span>
-      <span class="mono">Made for fun · 非官方项目</span>
+      <span data-i18n="footerNote">Starscope · 依据 GitHub 公开数据绘制，星标统计为静态快照。</span>
+      <span class="mono" data-i18n="footerMade">Made for fun · 非官方项目</span>
     </div>
   </footer>
 
@@ -230,14 +234,14 @@
 <div class="modal" id="share-modal" hidden role="dialog" aria-modal="true" aria-label="分享卡片">
   <div class="modal-panel">
     <div class="modal-head">
-      <h2>分享卡片</h2>
-      <button class="icon-btn" id="share-close" type="button" aria-label="关闭">✕</button>
+      <h2 data-i18n="shareModalTitle">分享卡片</h2>
+      <button class="icon-btn" id="share-close" type="button" aria-label="关闭" data-i18n-aria="closeAria">✕</button>
     </div>
     <div class="share-preview" id="share-preview"></div>
     <div class="modal-actions">
-      <button class="btn btn-primary" id="share-download" type="button">下载图片</button>
+      <button class="btn btn-primary" id="share-download" type="button" data-i18n="downloadBtn">下载图片</button>
     </div>
-    <p class="modal-note">已生成 1200×630 图片，适合直接发布到社交平台。文件名：<span class="mono" id="share-filename"></span></p>
+    <p class="modal-note"><span data-i18n="shareNotePre">已生成 1200×630 图片，适合直接发布到社交平台。文件名：</span><span class="mono" id="share-filename"></span></p>
   </div>
 </div>
 
@@ -245,26 +249,28 @@
 <div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-label="Token 设置">
   <div class="modal-panel" style="max-width:520px">
     <div class="modal-head">
-      <h2>GitHub Token（可选）</h2>
-      <button class="icon-btn" id="settings-close" type="button" aria-label="关闭">✕</button>
+      <h2 data-i18n="tokenTitle">GitHub Token（可选）</h2>
+      <button class="icon-btn" id="settings-close" type="button" aria-label="关闭" data-i18n-aria="closeAria">✕</button>
     </div>
-    <p class="modal-note" style="margin-top:0">
+    <p class="modal-note" style="margin-top:0" data-i18n="tokenDesc">
       未登录时 GitHub 接口每小时仅允许 60 次请求。填入一个只读 Token 可提升到每小时 5000 次。
       令牌仅保存在你浏览器的本地存储中，不会上传到任何服务器。
     </p>
     <div class="field">
-      <label for="token-input">Personal Access Token</label>
-      <input id="token-input" type="password" placeholder="ghp_… 或 github_pat_…" spellcheck="false">
-      <span class="hint">只需勾选 <span class="mono">public_repo</span> 或使用无权限的只读令牌即可。</span>
+      <label for="token-input" data-i18n="tokenLabel">Personal Access Token</label>
+      <input id="token-input" type="password" placeholder="ghp_… 或 github_pat_…"
+             data-i18n-ph="tokenPlaceholder" spellcheck="false">
+      <span class="hint"><span data-i18n="tokenHintPre">只需勾选</span> <span class="mono">public_repo</span> <span data-i18n="tokenHintPost">或使用无权限的只读令牌即可。</span></span>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-primary" id="settings-save" type="button">保存</button>
+      <button class="btn btn-primary" id="settings-save" type="button" data-i18n="saveBtn">保存</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
+<script src="./i18n.js"></script>
 <script src="./data.js"></script>
 <script src="./app.js"></script>
 </body>
