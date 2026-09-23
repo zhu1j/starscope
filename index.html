@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Starscope · 你的 GitHub 星象图</title>
+<meta name="description" content="输入 GitHub 用户名，把你星标过的仓库绘制成一张专属星象图，并生成可分享的技术品味卡片。">
+<meta name="theme-color" content="#05060f">
+<meta property="og:title" content="Starscope · 你的 GitHub 星象图">
+<meta property="og:description" content="把你星标过的仓库，绘制成一张专属星象图。">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='3.2' fill='%237cc4ff'/><circle cx='16' cy='16' r='12' fill='none' stroke='%237cc4ff' stroke-opacity='.45' stroke-width='1.4'/><circle cx='27' cy='10' r='1.8' fill='%23b79cff'/></svg>">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/space-grotesk@5.2.10/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/jetbrains-mono@5.2.8/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-sans-sc@5.2.10/index.css" rel="stylesheet">
+<link href="./style.css" rel="stylesheet">
+</head>
+<body>
+
+<canvas id="bg-stars" aria-hidden="true"></canvas>
+
+<div class="page-shell">
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Starscope 首页">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="3.4" fill="#7cc4ff"/>
+        <circle cx="16" cy="16" r="12" fill="none" stroke="#7cc4ff" stroke-opacity=".4" stroke-width="1.3"/>
+        <circle cx="27" cy="10" r="1.9" fill="#b79cff"/>
+        <circle cx="5" cy="22" r="1.5" fill="#63e6be"/>
+      </svg>
+      <span>Starscope</span>
+      <span class="brand-sub">GitHub 星象图</span>
+    </a>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" id="settings-btn" type="button">Token 设置</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ 首屏 ============ -->
+    <section class="view" id="view-intro">
+      <div class="intro">
+        <span class="intro-eyebrow"><i class="dot"></i>读取公开星标 · 无需登录</span>
+
+        <h1>你的 <span class="accent-text">GitHub 星象图</span></h1>
+
+        <p class="intro-lede">
+          输入一个 GitHub 用户名，我们会读取他公开星标过的仓库，
+          按技术方向聚成星座，画成一张专属星图——顺便告诉你，
+          你的技术品味到底长什么样。
+        </p>
+
+        <form class="search-form" id="search-form" autocomplete="off">
+          <span class="search-prefix" aria-hidden="true">github.com/</span>
+          <input class="search-input" id="search-input" type="text"
+                 placeholder="输入 GitHub 用户名，按 / 快速聚焦"
+                 aria-label="GitHub 用户名" spellcheck="false">
+          <button class="btn btn-primary" type="submit">探索星图</button>
+        </form>
+
+        <p class="intro-hint">
+          不想查人？<button class="link-btn" id="demo-btn" type="button">进入演示模式</button>
+          ，直接看一个示例的星象图长什么样。
+        </p>
+
+        <div class="intro-features">
+          <div class="feature">
+            <div class="feature-k">01 / 星座</div>
+            <h3>按方向聚星</h3>
+            <p>依据仓库的语言与标签，把星标自动归入 AI、前端、底层、云端等星座。</p>
+          </div>
+          <div class="feature">
+            <div class="feature-k">02 / 名片</div>
+            <h3>读懂技术品味</h3>
+            <p>语言分布、星标总数、集中度指数与技术灵魂标签，一屏看清你的偏好。</p>
+          </div>
+          <div class="feature">
+            <div class="feature-k">03 / 分享</div>
+            <h3>一键生成卡片</h3>
+            <p>导出 1200×630 分享图，直接发到社交平台，让朋友也来测一测。按 <span class="kbd">/</span> 聚焦输入框。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 加载态 ============ -->
+    <section class="view" id="view-loading" hidden>
+      <div class="loading">
+        <div class="orbit" aria-hidden="true">
+          <div class="orbit-ring"></div>
+          <div class="orbit-ring r2"></div>
+          <div class="orbit-runner"><span></span></div>
+          <div class="orbit-runner r2"><span></span></div>
+          <div class="orbit-core"></div>
+        </div>
+        <p class="loading-status" id="loading-status" role="status" aria-live="polite"></p>
+        <p class="loading-user" id="loading-user"></p>
+        <div class="loading-bar" aria-hidden="true"><i></i></div>
+      </div>
+    </section>
+
+    <!-- ============ 错误态 ============ -->
+    <section class="view" id="view-error" hidden>
+      <div class="error-card">
+        <h2 id="error-title">出了一点小问题</h2>
+        <p id="error-body"></p>
+        <p class="error-detail" id="error-detail"></p>
+        <button class="btn btn-primary" id="error-retry-btn" type="button">重试</button>
+        <button class="btn btn-ghost" id="error-demo-btn" type="button">进入演示模式</button>
+      </div>
+    </section>
+
+    <!-- ============ 结果页 ============ -->
+    <section class="view" id="view-result" hidden>
+
+      <div class="result-head">
+        <div id="result-avatar-wrap"></div>
+        <div class="result-id">
+          <h2 class="result-name">
+            <span id="result-name">—</span>
+            <a class="result-login" id="result-login" href="#" target="_blank" rel="noopener">@—</a>
+            <span class="badge-demo" id="badge-demo" hidden>演示数据</span>
+          </h2>
+          <p class="result-bio" id="result-bio"></p>
+          <div class="result-meta" id="result-meta"></div>
+        </div>
+      </div>
+
+      <div class="starmap-card">
+        <div class="starmap-head">
+          <div class="starmap-title">星标星图 <span id="starmap-title-user"></span></div>
+          <div class="starmap-scale">
+            <span>星点大小 = 仓库热度</span>
+            <span class="scale-dots" aria-hidden="true">
+              <i style="width:4px;height:4px"></i>
+              <i style="width:7px;height:7px"></i>
+              <i style="width:10px;height:10px"></i>
+            </span>
+          </div>
+        </div>
+        <div class="starmap-wrap">
+          <canvas id="starmap" role="img"
+                  aria-label="星标仓库星图，每颗星代表一个仓库，悬停可查看详情，点击可打开仓库"></canvas>
+          <div class="starmap-tip" id="starmap-tip" hidden></div>
+        </div>
+        <div class="starmap-foot">
+          <div class="legend" id="legend"></div>
+          <span id="starmap-foot-note"></span>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h2>技术名片</h2>
+        <span>基于你公开星标的静态统计</span>
+      </div>
+
+      <div class="grid-cards">
+        <div class="card">
+          <div class="card-label">星标总量</div>
+          <div class="stat-value num"><span id="stat-count">0</span></div>
+          <div class="stat-note" id="stat-count-note"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">累计星数</div>
+          <div class="stat-value num"><span id="stat-stars">0</span></div>
+          <div class="stat-note" id="stat-stars-note"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">品味集中度</div>
+          <div class="stat-value num"><span id="stat-focus">0</span><span class="stat-unit">/100</span></div>
+          <div class="stat-note" id="stat-focus-note"></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:14px">
+        <div class="card">
+          <div class="card-label">语言分布</div>
+          <div class="lang-list" id="lang-list" style="margin-top:14px"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">星座构成</div>
+          <div class="cat-list" id="cat-list" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:14px">
+        <div class="gem-card">
+          <div class="gem-tag">意外宝藏 · 被你发现的冷门星</div>
+          <div class="gem-name" id="gem-name">—</div>
+          <div class="gem-desc" id="gem-desc"></div>
+          <div class="gem-foot" id="gem-foot"></div>
+        </div>
+        <div class="soul-card">
+          <div class="soul-tag">技术灵魂</div>
+          <div class="soul-name" id="soul-name">—</div>
+          <div class="soul-desc" id="soul-desc"></div>
+          <div class="soul-meter">
+            <div class="soul-meter-top"><span>品味集中度</span><span>0 / 100</span></div>
+            <div class="soul-track"><div class="soul-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-primary" id="share-btn" type="button">生成分享卡片</button>
+        <a class="btn btn-ghost" id="result-link" href="#" target="_blank" rel="noopener">打开 GitHub 主页</a>
+        <button class="btn btn-ghost" id="again-btn" type="button">查别人</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>Starscope · 依据 GitHub 公开数据绘制，星标统计为静态快照。</span>
+      <span class="mono">Made for fun · 非官方项目</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- 分享弹窗 -->
+<div class="modal" id="share-modal" hidden role="dialog" aria-modal="true" aria-label="分享卡片">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h2>分享卡片</h2>
+      <button class="icon-btn" id="share-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="share-preview" id="share-preview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="share-download" type="button">下载图片</button>
+    </div>
+    <p class="modal-note">已生成 1200×630 图片，适合直接发布到社交平台。文件名：<span class="mono" id="share-filename"></span></p>
+  </div>
+</div>
+
+<!-- Token 设置弹窗 -->
+<div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-label="Token 设置">
+  <div class="modal-panel" style="max-width:520px">
+    <div class="modal-head">
+      <h2>GitHub Token（可选）</h2>
+      <button class="icon-btn" id="settings-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <p class="modal-note" style="margin-top:0">
+      未登录时 GitHub 接口每小时仅允许 60 次请求。填入一个只读 Token 可提升到每小时 5000 次。
+      令牌仅保存在你浏览器的本地存储中，不会上传到任何服务器。
+    </p>
+    <div class="field">
+      <label for="token-input">Personal Access Token</label>
+      <input id="token-input" type="password" placeholder="ghp_… 或 github_pat_…" spellcheck="false">
+      <span class="hint">只需勾选 <span class="mono">public_repo</span> 或使用无权限的只读令牌即可。</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="settings-save" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script src="./data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
