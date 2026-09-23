@@ -1,0 +1,2374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Starscope · 你的 GitHub 星象图</title>
+<meta name="description" content="输入 GitHub 用户名，把你星标过的仓库绘制成一张专属星象图，并生成可分享的技术品味卡片。">
+<meta name="theme-color" content="#05060f">
+<meta property="og:title" content="Starscope · 你的 GitHub 星象图">
+<meta property="og:description" content="把你星标过的仓库，绘制成一张专属星象图。">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='3.2' fill='%237cc4ff'/><circle cx='16' cy='16' r='12' fill='none' stroke='%237cc4ff' stroke-opacity='.45' stroke-width='1.4'/><circle cx='27' cy='10' r='1.8' fill='%23b79cff'/></svg>">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/space-grotesk@5.2.10/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/jetbrains-mono@5.2.8/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-sans-sc@5.2.10/index.css" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Starscope — 样式表
+   深空底色 + 单一青色强调色 + 用于编码星座类别的光谱调色
+   ========================================================================== */
+
+:root {
+  --bg: #05060f;
+  --bg-2: #0a0d1e;
+  --panel: rgba(255, 255, 255, 0.035);
+  --panel-2: rgba(255, 255, 255, 0.06);
+  --line: rgba(150, 175, 255, 0.14);
+  --line-strong: rgba(150, 175, 255, 0.3);
+  --text: #e9eefb;
+  --muted: #8b97b8;
+  --faint: #5c6784;
+  --accent: #7cc4ff;
+  --accent-soft: rgba(124, 196, 255, 0.13);
+  --danger: #ff7a90;
+
+  /* 星座类别光谱（同时用于图例、星点与统计条） */
+  --cat-ai: #7cc4ff;
+  --cat-web: #b79cff;
+  --cat-systems: #63e6be;
+  --cat-devops: #ffc46b;
+  --cat-tools: #ff8fb1;
+  --cat-other: #8b97b8;
+
+  --radius: 18px;
+  --radius-sm: 11px;
+  --radius-pill: 999px;
+  --maxw: 1140px;
+
+  --font-display: "Space Grotesk Variable", "Noto Sans SC Variable", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Space Grotesk Variable", "Noto Sans SC Variable", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  min-height: 100vh;
+  font-synthesis: none;
+  line-break: strict;
+  overflow-wrap: break-word;
+}
+
+[hidden] { display: none !important; }
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+p { margin: 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font-family: inherit; cursor: pointer; }
+canvas { display: block; }
+
+/* 数字与标识统一使用等宽 */
+.mono, .num, .stat-value, .repo-stars, .lang-pct {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 背景星场 ---------------------------------------------------------------- */
+#bg-stars {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.page-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* 顶栏 ------------------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: linear-gradient(to bottom, rgba(5, 6, 15, 0.92), rgba(5, 6, 15, 0.55));
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+.brand:hover { text-decoration: none; }
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.brand-sub {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+/* 按钮 ------------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 500;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--panel-2); border-color: rgba(150, 175, 255, 0.5); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn-primary {
+  background: linear-gradient(135deg, #8fd0ff, #7cc4ff 45%, #a78bfa);
+  border-color: transparent;
+  color: #05060f;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(124, 196, 255, 0.4), 0 10px 34px -12px rgba(124, 196, 255, 0.7);
+}
+.btn-primary:hover { background: linear-gradient(135deg, #a4dbff, #8fd0ff 45%, #b79cff); }
+
+.btn-ghost { background: transparent; border-color: var(--line); color: var(--muted); }
+.btn-ghost:hover { color: var(--text); }
+
+.btn-sm { padding: 8px 15px; font-size: 13.5px; }
+
+.btn-block { width: 100%; }
+
+/* 布局容器 --------------------------------------------------------------- */
+main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 40px) 72px;
+}
+
+.view { animation: view-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 首屏 ------------------------------------------------------------------- */
+.intro {
+  max-width: 780px;
+  margin: 0 auto;
+  padding-top: clamp(16px, 6vh, 76px);
+  text-align: center;
+}
+
+.intro-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+.intro-eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.intro h1 {
+  margin: 26px 0 0;
+  font-size: clamp(40px, 8vw, 76px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.intro h1 .accent-text {
+  background: linear-gradient(120deg, #8fd0ff, #b79cff 55%, #ff8fb1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.intro-lede {
+  margin: 20px auto 0;
+  max-width: 34em;
+  color: var(--muted);
+  font-size: clamp(15px, 1.6vw, 17.5px);
+  line-height: 1.75;
+}
+
+/* 搜索框 ----------------------------------------------------------------- */
+.search-form {
+  display: flex;
+  gap: 10px;
+  margin: 38px auto 0;
+  max-width: 540px;
+  padding: 8px 8px 8px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: rgba(10, 13, 30, 0.72);
+  backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.search-form:focus-within {
+  border-color: rgba(124, 196, 255, 0.65);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 20px 60px -30px rgba(124, 196, 255, 0.8);
+}
+.search-prefix {
+  display: flex;
+  align-items: center;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  user-select: none;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15.5px;
+  padding: 10px 4px;
+  outline: none;
+}
+.search-input::placeholder { color: var(--faint); }
+
+.intro-hint {
+  margin-top: 16px;
+  color: var(--faint);
+  font-size: 13.5px;
+}
+.intro-hint .link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 首屏特性说明 */
+.intro-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 56px;
+  text-align: left;
+}
+.feature {
+  padding: 18px 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.feature-k {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.feature h3 { font-size: 15.5px; margin: 9px 0 6px; }
+.feature p { color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+
+/* 键位提示 */
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* 加载态 ----------------------------------------------------------------- */
+.loading {
+  max-width: 560px;
+  margin: 0 auto;
+  padding-top: clamp(40px, 12vh, 130px);
+  text-align: center;
+}
+.orbit {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 30px;
+}
+.orbit-core {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 22px; height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #a4dbff, #7cc4ff 60%, #a78bfa);
+  box-shadow: 0 0 30px rgba(124, 196, 255, 0.9);
+}
+.orbit-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.orbit-ring.r2 { inset: 22px; border-color: rgba(183, 156, 255, 0.28); }
+.orbit-runner {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 100%; height: 0;
+  animation: orbit-spin 2.6s linear infinite;
+}
+.orbit-runner.r2 { width: 88px; height: 0; animation-duration: 1.7s; animation-direction: reverse; }
+.orbit-runner span {
+  position: absolute;
+  top: -3.5px; right: -3.5px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+.orbit-runner.r2 span { background: var(--accent-2, #b79cff); box-shadow: 0 0 12px #b79cff; }
+@keyframes orbit-spin { to { transform: rotate(360deg); } }
+
+.loading-status {
+  font-size: 15px;
+  color: var(--text);
+  min-height: 1.6em;
+}
+.loading-status .caret {
+  display: inline-block;
+  width: 8px; height: 17px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: var(--accent);
+  animation: caret-blink 1s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+.loading-user {
+  margin-top: 12px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+.loading-bar {
+  width: 220px; height: 3px;
+  margin: 26px auto 0;
+  border-radius: 3px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.loading-bar i {
+  display: block; height: 100%; width: 40%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: bar-sweep 1.3s ease-in-out infinite;
+}
+@keyframes bar-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+/* 错误态 ----------------------------------------------------------------- */
+.error-card {
+  max-width: 560px;
+  margin: clamp(40px, 12vh, 120px) auto 0;
+  padding: 30px;
+  border: 1px solid rgba(255, 122, 144, 0.35);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 122, 144, 0.08), var(--panel));
+  text-align: center;
+}
+.error-card h2 { font-size: 21px; margin-bottom: 10px; }
+.error-card p { color: var(--muted); font-size: 14.5px; }
+.error-card .error-detail {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.error-card .btn { margin-top: 22px; }
+
+/* 结果页 ----------------------------------------------------------------- */
+.result-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+}
+.avatar {
+  width: 78px; height: 78px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(135deg, #1b2340, #2a1f4a);
+  object-fit: cover;
+}
+.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.result-id { flex: 1 1 260px; min-width: 0; }
+.result-name {
+  font-size: clamp(26px, 4vw, 36px);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.result-login {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 400;
+}
+.result-bio {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 14.5px;
+  max-width: 60ch;
+}
+.result-meta {
+  margin-top: 12px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: var(--faint);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+}
+.badge-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border: 1px dashed rgba(255, 196, 107, 0.5);
+  border-radius: var(--radius-pill);
+  color: #ffc46b;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* 星图卡片 --------------------------------------------------------------- */
+.starmap-card {
+  position: relative;
+  margin-top: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(124, 196, 255, 0.09), transparent 55%),
+    radial-gradient(110% 90% at 85% 15%, rgba(183, 156, 255, 0.09), transparent 55%),
+    rgba(6, 8, 20, 0.72);
+  overflow: hidden;
+}
+.starmap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 22px 10px;
+}
+.starmap-title { font-size: 15px; letter-spacing: 0.02em; }
+.starmap-title span { color: var(--faint); font-weight: 400; font-size: 13px; }
+.starmap-scale {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+}
+.scale-dots { display: flex; align-items: center; gap: 5px; }
+.scale-dots i { border-radius: 50%; background: var(--muted); display: block; }
+
+.starmap-wrap { position: relative; width: 100%; }
+#starmap { width: 100%; height: auto; display: block; }
+
+.starmap-tip {
+  position: absolute;
+  z-index: 5;
+  min-width: 190px;
+  max-width: 290px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 11, 24, 0.96);
+  box-shadow: 0 22px 50px -20px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 16px));
+  transition: opacity 0.14s ease;
+}
+.starmap-tip .tip-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.starmap-tip .tip-desc {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.starmap-tip .tip-foot {
+  margin-top: 9px;
+  display: flex;
+  gap: 12px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+}
+.starmap-tip .tip-cat { display: inline-flex; align-items: center; gap: 6px; }
+.starmap-tip .tip-cat i { width: 7px; height: 7px; border-radius: 50%; }
+
+.starmap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 22px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* 图例 ------------------------------------------------------------------- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12.5px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.legend-item:hover, .legend-item.active {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+}
+.legend-item i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.legend-item .legend-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* 名片网格 --------------------------------------------------------------- */
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 44px 0 18px;
+}
+.section-title h2 { font-size: 20px; }
+.section-title span { color: var(--faint); font-size: 13px; }
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.card-label {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.stat-value {
+  margin-top: 10px;
+  font-size: clamp(28px, 3.4vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.stat-unit { font-size: 14px; color: var(--muted); margin-left: 5px; font-family: var(--font-body); }
+.stat-note { margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+/* 语言分布条 */
+.lang-list { display: grid; gap: 13px; }
+.lang-row { display: grid; grid-template-columns: 108px 1fr 52px; gap: 12px; align-items: center; }
+.lang-name { font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lang-track { height: 7px; border-radius: 7px; background: var(--panel-2); overflow: hidden; }
+.lang-fill { height: 100%; border-radius: 7px; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.lang-pct { font-size: 12px; color: var(--muted); text-align: right; }
+
+/* 星座统计列表 */
+.cat-list { display: grid; gap: 10px; }
+.cat-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: default;
+}
+.cat-row i { width: 10px; height: 10px; border-radius: 50%; }
+.cat-name { font-size: 13.5px; }
+.cat-name small { display: block; color: var(--faint); font-size: 11.5px; font-family: var(--font-mono); }
+.cat-count { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+
+/* 意外宝藏 + 技术灵魂 */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.gem-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid rgba(255, 196, 107, 0.3);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 140% at 10% 0%, rgba(255, 196, 107, 0.12), transparent 60%),
+    var(--panel);
+}
+.gem-tag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffc46b;
+}
+.gem-name { font-size: 19px; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.gem-desc { color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.gem-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--faint);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+}
+
+.soul-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid rgba(183, 156, 255, 0.32);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 140% at 10% 0%, rgba(183, 156, 255, 0.14), transparent 60%),
+    var(--panel);
+}
+.soul-tag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b79cff;
+}
+.soul-name { font-size: 24px; letter-spacing: -0.02em; }
+.soul-desc { color: var(--muted); font-size: 13.5px; line-height: 1.65; }
+.soul-meter { display: grid; gap: 7px; margin-top: auto; }
+.soul-meter-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); font-family: var(--font-mono); }
+.soul-track { height: 6px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
+.soul-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #7cc4ff, #b79cff); }
+
+/* 结果页操作区 */
+.result-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+/* 分享弹窗 --------------------------------------------------------------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(3, 4, 10, 0.78);
+  backdrop-filter: blur(6px);
+  animation: view-in 0.25s ease both;
+}
+.modal-panel {
+  width: 100%;
+  max-width: 720px;
+  max-height: 92vh;
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.95);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.modal-head h2 { font-size: 18px; }
+.icon-btn {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+}
+.icon-btn:hover { color: var(--text); border-color: var(--line-strong); }
+.share-preview {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #05060f;
+}
+.share-preview canvas { width: 100%; height: auto; }
+.modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.modal-note { margin-top: 12px; color: var(--faint); font-size: 12.5px; }
+
+/* Token 设置 */
+.field { display: grid; gap: 8px; margin-top: 14px; }
+.field label { font-size: 13px; color: var(--muted); }
+.field input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+.field input:focus { border-color: var(--accent); }
+.field .hint { color: var(--faint); font-size: 12px; line-height: 1.6; }
+
+/* Toast ------------------------------------------------------------------ */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  z-index: 80;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: rgba(12, 16, 34, 0.96);
+  color: var(--text);
+  font-size: 13.5px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.9);
+  animation: view-in 0.25s ease both;
+}
+
+/* 页脚 ------------------------------------------------------------------- */
+.site-footer {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: 26px clamp(16px, 4vw, 40px);
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.footer-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.footer-inner .mono { font-size: 12px; }
+
+/* 响应式 ----------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .intro-features { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+  .result-head { gap: 16px; }
+}
+
+@media (max-width: 560px) {
+  body { font-size: 15px; }
+  .search-form { flex-direction: column; padding: 12px; border-radius: var(--radius); }
+  .search-prefix { padding-left: 6px; }
+  .search-form .btn { width: 100%; }
+  .lang-row { grid-template-columns: 82px 1fr 44px; }
+  .brand-sub { display: none; }
+  .legend-item { font-size: 12px; }
+  .grid-cards { grid-template-columns: 1fr 1fr; }
+  .card { padding: 16px; }
+}
+
+@media (max-width: 380px) {
+  .grid-cards { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<canvas id="bg-stars" aria-hidden="true"></canvas>
+
+<div class="page-shell">
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Starscope 首页">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="3.4" fill="#7cc4ff"/>
+        <circle cx="16" cy="16" r="12" fill="none" stroke="#7cc4ff" stroke-opacity=".4" stroke-width="1.3"/>
+        <circle cx="27" cy="10" r="1.9" fill="#b79cff"/>
+        <circle cx="5" cy="22" r="1.5" fill="#63e6be"/>
+      </svg>
+      <span>Starscope</span>
+      <span class="brand-sub">GitHub 星象图</span>
+    </a>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" id="settings-btn" type="button">Token 设置</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ 首屏 ============ -->
+    <section class="view" id="view-intro">
+      <div class="intro">
+        <span class="intro-eyebrow"><i class="dot"></i>读取公开星标 · 无需登录</span>
+
+        <h1>你的 <span class="accent-text">GitHub 星象图</span></h1>
+
+        <p class="intro-lede">
+          输入一个 GitHub 用户名，我们会读取他公开星标过的仓库，
+          按技术方向聚成星座，画成一张专属星图——顺便告诉你，
+          你的技术品味到底长什么样。
+        </p>
+
+        <form class="search-form" id="search-form" autocomplete="off">
+          <span class="search-prefix" aria-hidden="true">github.com/</span>
+          <input class="search-input" id="search-input" type="text"
+                 placeholder="输入 GitHub 用户名，按 / 快速聚焦"
+                 aria-label="GitHub 用户名" spellcheck="false">
+          <button class="btn btn-primary" type="submit">探索星图</button>
+        </form>
+
+        <p class="intro-hint">
+          不想查人？<button class="link-btn" id="demo-btn" type="button">进入演示模式</button>
+          ，直接看一个示例的星象图长什么样。
+        </p>
+
+        <div class="intro-features">
+          <div class="feature">
+            <div class="feature-k">01 / 星座</div>
+            <h3>按方向聚星</h3>
+            <p>依据仓库的语言与标签，把星标自动归入 AI、前端、底层、云端等星座。</p>
+          </div>
+          <div class="feature">
+            <div class="feature-k">02 / 名片</div>
+            <h3>读懂技术品味</h3>
+            <p>语言分布、星标总数、集中度指数与技术灵魂标签，一屏看清你的偏好。</p>
+          </div>
+          <div class="feature">
+            <div class="feature-k">03 / 分享</div>
+            <h3>一键生成卡片</h3>
+            <p>导出 1200×630 分享图，直接发到社交平台，让朋友也来测一测。按 <span class="kbd">/</span> 聚焦输入框。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 加载态 ============ -->
+    <section class="view" id="view-loading" hidden>
+      <div class="loading">
+        <div class="orbit" aria-hidden="true">
+          <div class="orbit-ring"></div>
+          <div class="orbit-ring r2"></div>
+          <div class="orbit-runner"><span></span></div>
+          <div class="orbit-runner r2"><span></span></div>
+          <div class="orbit-core"></div>
+        </div>
+        <p class="loading-status" id="loading-status" role="status" aria-live="polite"></p>
+        <p class="loading-user" id="loading-user"></p>
+        <div class="loading-bar" aria-hidden="true"><i></i></div>
+      </div>
+    </section>
+
+    <!-- ============ 错误态 ============ -->
+    <section class="view" id="view-error" hidden>
+      <div class="error-card">
+        <h2 id="error-title">出了一点小问题</h2>
+        <p id="error-body"></p>
+        <p class="error-detail" id="error-detail"></p>
+        <button class="btn btn-primary" id="error-retry-btn" type="button">重试</button>
+        <button class="btn btn-ghost" id="error-demo-btn" type="button">进入演示模式</button>
+      </div>
+    </section>
+
+    <!-- ============ 结果页 ============ -->
+    <section class="view" id="view-result" hidden>
+
+      <div class="result-head">
+        <div id="result-avatar-wrap"></div>
+        <div class="result-id">
+          <h2 class="result-name">
+            <span id="result-name">—</span>
+            <a class="result-login" id="result-login" href="#" target="_blank" rel="noopener">@—</a>
+            <span class="badge-demo" id="badge-demo" hidden>演示数据</span>
+          </h2>
+          <p class="result-bio" id="result-bio"></p>
+          <div class="result-meta" id="result-meta"></div>
+        </div>
+      </div>
+
+      <div class="starmap-card">
+        <div class="starmap-head">
+          <div class="starmap-title">星标星图 <span id="starmap-title-user"></span></div>
+          <div class="starmap-scale">
+            <span>星点大小 = 仓库热度</span>
+            <span class="scale-dots" aria-hidden="true">
+              <i style="width:4px;height:4px"></i>
+              <i style="width:7px;height:7px"></i>
+              <i style="width:10px;height:10px"></i>
+            </span>
+          </div>
+        </div>
+        <div class="starmap-wrap">
+          <canvas id="starmap" role="img"
+                  aria-label="星标仓库星图，每颗星代表一个仓库，悬停可查看详情，点击可打开仓库"></canvas>
+          <div class="starmap-tip" id="starmap-tip" hidden></div>
+        </div>
+        <div class="starmap-foot">
+          <div class="legend" id="legend"></div>
+          <span id="starmap-foot-note"></span>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h2>技术名片</h2>
+        <span>基于你公开星标的静态统计</span>
+      </div>
+
+      <div class="grid-cards">
+        <div class="card">
+          <div class="card-label">星标总量</div>
+          <div class="stat-value num"><span id="stat-count">0</span></div>
+          <div class="stat-note" id="stat-count-note"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">累计星数</div>
+          <div class="stat-value num"><span id="stat-stars">0</span></div>
+          <div class="stat-note" id="stat-stars-note"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">品味集中度</div>
+          <div class="stat-value num"><span id="stat-focus">0</span><span class="stat-unit">/100</span></div>
+          <div class="stat-note" id="stat-focus-note"></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:14px">
+        <div class="card">
+          <div class="card-label">语言分布</div>
+          <div class="lang-list" id="lang-list" style="margin-top:14px"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">星座构成</div>
+          <div class="cat-list" id="cat-list" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:14px">
+        <div class="gem-card">
+          <div class="gem-tag">意外宝藏 · 被你发现的冷门星</div>
+          <div class="gem-name" id="gem-name">—</div>
+          <div class="gem-desc" id="gem-desc"></div>
+          <div class="gem-foot" id="gem-foot"></div>
+        </div>
+        <div class="soul-card">
+          <div class="soul-tag">技术灵魂</div>
+          <div class="soul-name" id="soul-name">—</div>
+          <div class="soul-desc" id="soul-desc"></div>
+          <div class="soul-meter">
+            <div class="soul-meter-top"><span>品味集中度</span><span>0 / 100</span></div>
+            <div class="soul-track"><div class="soul-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-primary" id="share-btn" type="button">生成分享卡片</button>
+        <a class="btn btn-ghost" id="result-link" href="#" target="_blank" rel="noopener">打开 GitHub 主页</a>
+        <button class="btn btn-ghost" id="again-btn" type="button">查别人</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>Starscope · 依据 GitHub 公开数据绘制，星标统计为静态快照。</span>
+      <span class="mono">Made for fun · 非官方项目</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- 分享弹窗 -->
+<div class="modal" id="share-modal" hidden role="dialog" aria-modal="true" aria-label="分享卡片">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h2>分享卡片</h2>
+      <button class="icon-btn" id="share-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="share-preview" id="share-preview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="share-download" type="button">下载图片</button>
+    </div>
+    <p class="modal-note">已生成 1200×630 图片，适合直接发布到社交平台。文件名：<span class="mono" id="share-filename"></span></p>
+  </div>
+</div>
+
+<!-- Token 设置弹窗 -->
+<div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-label="Token 设置">
+  <div class="modal-panel" style="max-width:520px">
+    <div class="modal-head">
+      <h2>GitHub Token（可选）</h2>
+      <button class="icon-btn" id="settings-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <p class="modal-note" style="margin-top:0">
+      未登录时 GitHub 接口每小时仅允许 60 次请求。填入一个只读 Token 可提升到每小时 5000 次。
+      令牌仅保存在你浏览器的本地存储中，不会上传到任何服务器。
+    </p>
+    <div class="field">
+      <label for="token-input">Personal Access Token</label>
+      <input id="token-input" type="password" placeholder="ghp_… 或 github_pat_…" spellcheck="false">
+      <span class="hint">只需勾选 <span class="mono">public_repo</span> 或使用无权限的只读令牌即可。</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="settings-save" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+   Starscope — bundled sample dataset (demo mode)
+   --------------------------------------------------------------------------
+   这些条目是公开知名仓库的近似快照，仅用于「演示模式」：
+   让任何人都能在不消耗 GitHub API 配额的情况下体验星空图效果。
+   星标为近似值，不代表实时数据。DEMO_PROFILE 为虚构示例用户。
+   ========================================================================== */
+
+var DEMO_PROFILE = {
+  login: "octo-explorer",
+  name: "Octo Explorer",
+  bio: "演示档案 · 用于预览星象图效果，非真实用户数据",
+  avatar_url: "",
+  html_url: "https://github.com/",
+  public_repos: 128,
+  followers: 642,
+  following: 180,
+  created_at: "2015-03-11T00:00:00Z",
+  location: "The Cosmos",
+  company: "Interstellar Dev Co."
+};
+
+/* [owner, name, language, stars, topics, description] */
+var DEMO_REPOS = [
+  ["langchain-ai","langchain","Python",112000,"llm,ai,agents,rag,nlp","Build context-aware reasoning applications with LLMs"],
+  ["run-llama","llama_index","Python",38500,"llm,rag,ai,data","A data framework for LLM applications"],
+  ["huggingface","transformers","Python",142000,"nlp,deep-learning,ai,pytorch","State-of-the-art machine learning for PyTorch and TensorFlow"],
+  ["ollama","ollama","Go",108000,"llm,ai,local","Get up and running with large language models locally"],
+  ["comfyanonymous","ComfyUI","Python",82000,"diffusion,ai,generative,image","The most powerful node-based Stable Diffusion GUI"],
+  ["ggerganov","llama.cpp","C++",78000,"llm,ai,inference","LLM inference in C/C++ with minimal dependencies"],
+  ["openai","openai-python","Python",24000,"openai,ai,sdk","The official Python library for the OpenAI API"],
+  ["microsoft","autogen","Python",46000,"agent,ai,llm,multiagent","A programming framework for agentic AI"],
+  ["facebook","react","JavaScript",232000,"react,frontend,ui,javascript","The library for web and native user interfaces"],
+  ["vercel","next.js","JavaScript",131000,"react,nextjs,frontend,ssr","The React framework for the web"],
+  ["vuejs","core","TypeScript",49000,"vue,frontend,framework","Vue.js is a progressive JavaScript framework"],
+  ["tailwindlabs","tailwindcss","TypeScript",84000,"css,frontend,ui,tailwind","A utility-first CSS framework"],
+  ["sveltejs","svelte","JavaScript",81000,"svelte,frontend,compiler","Cybernetically enhanced web apps"],
+  ["vitejs","vite","TypeScript",71000,"vite,build,frontend,bundler","Next generation frontend tooling"],
+  ["mrdoob","three.js","JavaScript",103000,"3d,webgl,graphics,frontend","JavaScript 3D library for the web"],
+  ["shadcn-ui","ui","TypeScript",76000,"ui,react,components,design-system","Beautifully designed components you can copy into your apps"],
+  ["torvalds","linux","C",185000,"linux,kernel,systems,os","Linux kernel source tree"],
+  ["golang","go","Go",122000,"go,language,backend,concurrency","The Go programming language"],
+  ["rust-lang","rust","Rust",100000,"rust,language,systems,compiler","Empowering everyone to build reliable and efficient software"],
+  ["nodejs","node","JavaScript",110000,"nodejs,runtime,backend,javascript","Node.js JavaScript runtime"],
+  ["spring-projects","spring-boot","Java",77000,"java,spring,backend,framework","Spring Boot helps you build production-ready applications"],
+  ["django","django","Python",84000,"python,django,backend,web","The web framework for perfectionists with deadlines"],
+  ["fastapi","fastapi","Python",81000,"python,fastapi,api,backend","FastAPI framework, high performance, easy to learn"],
+  ["redis","redis","C",68000,"redis,database,cache,backend","Redis is an in-memory data store used as a database and cache"],
+  ["postgres","postgres","C",17500,"database,sql,backend,postgresql","Mirror of the PostgreSQL source code repository"],
+  ["kubernetes","kubernetes","Go",112000,"kubernetes,devops,cloud,containers","Production-grade container scheduling and management"],
+  ["hashicorp","terraform","Go",44000,"terraform,devops,infrastructure,cloud","Terraform enables you to safely build infrastructure as code"],
+  ["docker","compose","Go",35000,"docker,devops,containers,cli","Define and run multi-container applications with Docker"],
+  ["grafana","grafana","TypeScript",67000,"monitoring,observability,devops,dashboards","The open and composable observability platform"],
+  ["prometheus","prometheus","Go",60000,"monitoring,metrics,observability,devops","The Prometheus monitoring system and time series database"],
+  ["ansible","ansible","Python",64000,"automation,devops,configuration","Ansible is a radically simple IT automation platform"],
+  ["traefik","traefik","Go",53000,"proxy,devops,cloud-native,gateway","The Cloud Native Application Proxy"],
+  ["caddyserver","caddy","Go",63000,"server,web,https,devops","Fast, multi-platform web server with automatic HTTPS"],
+  ["microsoft","vscode","TypeScript",168000,"editor,typescript,ide,tools","Visual Studio Code, the open source code editor"],
+  ["neovim","neovim","Vim Script",88000,"vim,editor,terminal,tools","Vim-fork focused on extensibility and usability"],
+  ["ohmyzsh","ohmyzsh","Shell",176000,"shell,zsh,terminal,productivity","A delightful community-driven framework for Zsh"],
+  ["junegunn","fzf","Go",66000,"cli,terminal,fuzzy-finder,tools","A command-line fuzzy finder written in Go"],
+  ["sharkdp","bat","Rust",52000,"cli,terminal,rust,tools","A cat clone with syntax highlighting and Git integration"],
+  ["BurntSushi","ripgrep","Rust",51000,"cli,search,rust,tools","ripgrep recursively searches directories for a regex pattern"],
+  ["tmux","tmux","C",37000,"terminal,cli,tools,multiplexer","tmux is a terminal multiplexer"],
+  ["cli","cli","Go",39000,"cli,github,tools","GitHub's official command line tool"],
+  ["dylanaraps","neofetch","Shell",21500,"cli,terminal,system-info,tools","A fast, highly customizable system info script"],
+  ["svenstaro","genact","Rust",12500,"cli,terminal,fake,productivity","A nonsense activity generator for your terminal"],
+  ["pipeseroni","pipes.sh","Shell",5600,"cli,terminal,animation,tools","Animated pipes terminal screensaver"]
+];
+
+</script>
+<script>
+/* ==========================================================================
+   Starscope — 应用逻辑
+   数据获取 → 星座分类 → Canvas 星图 → 技术名片 → 分享卡片
+   无后端依赖；核心渲染不依赖网络与存储。
+   ========================================================================== */
+(function () {
+  "use strict";
+
+  /* ---------- 常量与工具 ---------- */
+
+  var API = "https://api.github.com";
+  var STAR_PAGE_SIZE = 100;
+  var MAX_STARS = 200;
+  var MAX_FETCH_PAGES = 2;
+
+  function byId(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    if (s === null || s === undefined) return "";
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function fmt(n) {
+    if (typeof n !== "number" || isNaN(n)) return "—";
+    return n.toLocaleString("en-US");
+  }
+
+  /* 受保护的本地存储：不可用时静默降级 */
+  var store = (function () {
+    try {
+      var k = "__starscope_probe__";
+      window.localStorage.setItem(k, "1");
+      window.localStorage.removeItem(k);
+      return window.localStorage;
+    } catch (e) { return null; }
+  })();
+
+  function storeGet(key) {
+    try { return store ? store.getItem(key) : null; } catch (e) { return null; }
+  }
+  function storeSet(key, val) {
+    try { if (store) store.setItem(key, val); } catch (e) { /* 忽略配额或隐私模式错误 */ }
+  }
+
+  /* 稳定伪随机：同一输入永远得到同一输出，保证星图可复现 */
+  function seedRandom(seedStr) {
+    var h = 2166136261;
+    for (var i = 0; i < seedStr.length; i++) {
+      h ^= seedStr.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    var s = h >>> 0;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  /* ---------- 星座分类体系 ---------- */
+
+  var CATEGORIES = [
+    {
+      id: "ai", color: "#7cc4ff", name: "AI 星系", short: "AI",
+      desc: "大模型、机器学习与智能应用",
+      keys: ["ai", "llm", "gpt", "ml", "machine-learning", "deep-learning", "nlp",
+        "transformer", "diffusion", "neural", "agent", "agents", "rag", "openai",
+        "generative", "embedding", "pytorch", "tensorflow", "inference", "chatbot", "multiagent"]
+    },
+    {
+      id: "web", color: "#b79cff", name: "前端星云", short: "Web",
+      desc: "界面、框架与浏览器体验",
+      keys: ["react", "vue", "svelte", "frontend", "css", "html", "javascript",
+        "typescript", "nextjs", "tailwind", "ui", "three", "webgl", "web",
+        "components", "design-system", "framework", "ssr", "bundler"]
+    },
+    {
+      id: "systems", color: "#63e6be", name: "底层星域", short: "Systems",
+      desc: "语言、内核与系统编程",
+      keys: ["c", "c++", "rust", "go", "golang", "kernel", "linux", "compiler",
+        "systems", "os", "language", "concurrency", "wasm", "embedded"]
+    },
+    {
+      id: "devops", color: "#ffc46b", name: "云端星团", short: "DevOps",
+      desc: "容器、基础设施与可观测性",
+      keys: ["kubernetes", "docker", "devops", "terraform", "aws", "cloud", "ci",
+        "cd", "monitoring", "observability", "ansible", "prometheus", "grafana",
+        "containers", "infrastructure", "proxy", "gateway", "server", "https", "cloud-native"]
+    },
+    {
+      id: "data", color: "#ff8fb1", name: "数据星簇", short: "Data",
+      desc: "数据库、检索与数据管线",
+      keys: ["database", "sql", "postgres", "postgresql", "redis", "data", "etl",
+        "spark", "kafka", "cache", "analytics", "search", "storage", "mysql", "mongodb"]
+    },
+    {
+      id: "tools", color: "#a8e06a", name: "工具星群", short: "Tools",
+      desc: "命令行、编辑器与生产力",
+      keys: ["cli", "terminal", "editor", "vim", "shell", "zsh", "productivity",
+        "tools", "git", "ide", "fuzzy-finder", "multiplexer", "system-info", "animation", "fake"]
+    }
+  ];
+
+  var OTHER_CAT = {
+    id: "other", color: "#8b97b8", name: "远航星尘", short: "Other",
+    desc: "尚未归类的探索足迹"
+  };
+
+  function classify(repo) {
+    var lang = (repo.language || "").toLowerCase();
+    var topics = (repo.topics || []).map(function (t) { return String(t).toLowerCase(); });
+    var hay = topics.concat([lang, (repo.name || "").toLowerCase(),
+      (repo.description || "").toLowerCase()]);
+    var best = null, bestScore = 0;
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      var cat = CATEGORIES[i], score = 0;
+      for (var j = 0; j < cat.keys.length; j++) {
+        var key = cat.keys[j];
+        for (var k = 0; k < hay.length; k++) {
+          if (!hay[k]) continue;
+          if (hay[k] === key) { score += 3; break; }
+          if (hay[k].indexOf(key) !== -1) { score += 1; break; }
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = cat; }
+    }
+    return best || OTHER_CAT;
+  }
+
+  /* ---------- 视图切换 ---------- */
+
+  var VIEWS = ["view-intro", "view-loading", "view-error", "view-result"];
+
+  function showView(id) {
+    VIEWS.forEach(function (v) {
+      var el = byId(v);
+      if (el) el.hidden = (v !== id);
+    });
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  /* ---------- 数据获取 ---------- */
+
+  function authHeaders() {
+    var h = { "Accept": "application/vnd.github+json" };
+    var token = storeGet("starscope_token");
+    if (token) h["Authorization"] = "Bearer " + token;
+    return h;
+  }
+
+  function normalize(item) {
+    // item 可能是 API 原始对象，也可能是演示数组
+    if (Array.isArray(item)) {
+      return {
+        owner: item[0], name: item[1], full_name: item[0] + "/" + item[1],
+        html_url: "https://github.com/" + item[0] + "/" + item[1],
+        language: item[2] || null, stars: item[3] || 0,
+        topics: (item[4] ? item[4].split(",") : []),
+        description: item[5] || ""
+      };
+    }
+    return {
+      owner: item.owner ? item.owner.login : "",
+      name: item.name,
+      full_name: item.full_name,
+      html_url: item.html_url,
+      language: item.language,
+      stars: item.stargazers_count || 0,
+      topics: item.topics || [],
+      description: item.description || ""
+    };
+  }
+
+  function buildDemoData() {
+    return {
+      profile: {
+        login: DEMO_PROFILE.login,
+        name: DEMO_PROFILE.name,
+        bio: DEMO_PROFILE.bio,
+        avatar_url: DEMO_PROFILE.avatar_url,
+        html_url: DEMO_PROFILE.html_url,
+        public_repos: DEMO_PROFILE.public_repos,
+        followers: DEMO_PROFILE.followers,
+        following: DEMO_PROFILE.following,
+        company: DEMO_PROFILE.company,
+        location: DEMO_PROFILE.location,
+        created_at: DEMO_PROFILE.created_at
+      },
+      repos: DEMO_REPOS.map(normalize),
+      demo: true,
+      truncated: false
+    };
+  }
+
+  function apiError(code, detail) {
+    var e = new Error(detail || code);
+    e.code = code;
+    return e;
+  }
+
+  function fetchStarred(username, headers) {
+    var collected = [];
+    function step(page) {
+      if (page > MAX_FETCH_PAGES || collected.length >= MAX_STARS) {
+        return Promise.resolve();
+      }
+      var url = API + "/users/" + encodeURIComponent(username) +
+        "/starred?per_page=" + STAR_PAGE_SIZE + "&page=" + page;
+      return fetch(url, { headers: headers }).then(function (res) {
+        if (res.status === 403 || res.status === 429) {
+          throw apiError("ratelimit", "GitHub API 请求频率已达上限");
+        }
+        if (!res.ok) return; // 无星标或权限受限：保留已获取部分
+        return res.json().then(function (batch) {
+          if (!Array.isArray(batch) || batch.length === 0) return;
+          collected = collected.concat(batch);
+          if (batch.length === STAR_PAGE_SIZE) return step(page + 1);
+        });
+      });
+    }
+    return step(1).then(function () {
+      return collected.map(normalize);
+    });
+  }
+
+  function loadUser(username) {
+    var headers = authHeaders();
+    var profileUrl = API + "/users/" + encodeURIComponent(username);
+    return fetch(profileUrl, { headers: headers }).then(function (res) {
+      if (res.status === 404) throw apiError("notfound", "未找到该 GitHub 用户");
+      if (res.status === 403 || res.status === 429) {
+        throw apiError("ratelimit", "GitHub API 请求频率已达上限");
+      }
+      if (!res.ok) throw apiError("http", "请求失败，状态码 " + res.status);
+      return res.json();
+    }).then(function (profile) {
+      return fetchStarred(username, headers).then(function (repos) {
+        return {
+          profile: profile,
+          repos: repos,
+          demo: false,
+          truncated: repos.length >= MAX_STARS
+        };
+      });
+    });
+  }
+
+  /* ---------- 统计计算 ---------- */
+
+  function computeStats(data) {
+    var repos = data.repos.slice();
+    repos.forEach(function (r) { r.cat = classify(r); });
+
+    var catMap = {};
+    repos.forEach(function (r) {
+      if (!catMap[r.cat.id]) {
+        catMap[r.cat.id] = { cat: r.cat, repos: [], topStars: 0 };
+      }
+      catMap[r.cat.id].repos.push(r);
+      catMap[r.cat.id].topStars += r.stars;
+    });
+    var catStats = Object.keys(catMap).map(function (k) { return catMap[k]; })
+      .sort(function (a, b) { return b.repos.length - a.repos.length; });
+
+    var langMap = {};
+    repos.forEach(function (r) {
+      var l = r.language || "Other";
+      langMap[l] = (langMap[l] || 0) + 1;
+    });
+    var langStats = Object.keys(langMap).map(function (l) {
+      return { lang: l, count: langMap[l] };
+    }).sort(function (a, b) { return b.count - a.count; });
+
+    var totalStars = repos.reduce(function (s, r) { return s + r.stars; }, 0);
+    var sortedByStars = repos.slice().sort(function (a, b) { return b.stars - a.stars; });
+    // 意外宝藏：星标数较少但确实被收录的仓库
+    var gemPool = repos.slice().sort(function (a, b) { return a.stars - b.stars; });
+    var gem = gemPool.length ? gemPool[Math.min(gemPool.length - 1, 0)] : null;
+
+    var topCat = catStats[0] || { cat: OTHER_CAT, repos: [] };
+    var topShare = repos.length ? topCat.repos.length / repos.length : 0;
+
+    return {
+      repos: repos,
+      count: repos.length,
+      catStats: catStats,
+      langStats: langStats,
+      totalStars: totalStars,
+      mostStarred: sortedByStars[0] || null,
+      gem: gem,
+      topCat: topCat.cat,
+      topShare: topShare,
+      categoryCount: catStats.length,
+      demo: !!data.demo,
+      truncated: !!data.truncated,
+      profile: data.profile
+    };
+  }
+
+  /* ---------- 技术灵魂标签 ---------- */
+
+  var SOULS = {
+    ai: { title: "星际炼金术士", desc: "你的收藏夹里，模型与智能体在不停地自我演化。" },
+    web: { title: "界面铸形者", desc: "你更在乎像素之下的体验与交互的呼吸感。" },
+    systems: { title: "底层造物主", desc: "你愿意俯身到内存与调度器之间，直面无常。" },
+    devops: { title: "云端领航员", desc: "你相信一切基础设施都应当被声明、被度量。" },
+    data: { title: "数据溯流人", desc: "在你的世界里，每条数据都必须有来处与去向。" },
+    tools: { title: "工具收藏家", desc: "你的终端里藏着一整个世界的效率器械。" },
+    other: { title: "自由漫游者", desc: "你不属于任何星座，你四处采集光亮。" }
+  };
+
+  function soulFor(stats) {
+    return SOULS[stats.topCat.id] || SOULS.other;
+  }
+
+  /* 基于自身星标结构估算的集中度指数（0-100），非与他人的真实比对 */
+  function focusIndex(stats) {
+    if (!stats.count) return 0;
+    var top = Math.round(stats.topShare * 100);
+    var diversityPenalty = Math.max(0, (stats.categoryCount - 1)) * 4;
+    return Math.max(12, Math.min(99, top + 18 - diversityPenalty));
+  }
+
+  /* ---------- Canvas 星图 ---------- */
+
+  var StarMap = (function () {
+    var canvas, ctx, W = 1000, H = 620, DPR = 1;
+    var stars = [], links = [], cats = [];
+    var hovered = null, raf = null, t0 = 0, reduced = false;
+    var tipEl;
+
+    function layout(stats) {
+      cats = stats.catStats.slice(0, 7);
+      var n = cats.length;
+      var rng = seedRandom("starscope|" + (stats.profile.login || "") + "|" + stats.count);
+      var cx = W / 2, cy = H / 2 + 6;
+      var maxR = Math.min(W, H) * 0.36;
+
+      stars = []; links = [];
+      cats.forEach(function (cs, ci) {
+        var angle = (ci / Math.max(1, n)) * Math.PI * 2 - Math.PI / 2;
+        var dist = n === 1 ? 0 : maxR * (0.62 + rng() * 0.5);
+        var ax = cx + Math.cos(angle) * dist;
+        var ay = cy + Math.sin(angle) * dist * 0.82;
+        cs._ax = ax; cs._ay = ay;
+
+        var spread = Math.max(38, 130 - cs.repos.length * 3);
+        var local = [];
+        cs.repos.forEach(function (repo) {
+          var a = rng() * Math.PI * 2;
+          var rr = Math.sqrt(rng()) * spread;
+          var x = ax + Math.cos(a) * rr;
+          var y = ay + Math.sin(a) * rr * 0.82;
+          var mag = Math.max(0.6, Math.log10(repo.stars + 10) / 5);
+          var st = {
+            x: x, y: y, ax: ax, ay: ay,
+            r: 1.6 + mag * 4.2,
+            repo: repo, cat: cs.cat,
+            phase: rng() * Math.PI * 2,
+            speed: 0.6 + rng() * 1.2
+          };
+          local.push(st);
+          stars.push(st);
+        });
+        // 星座连线：按角度排序后相邻连接
+        local.sort(function (p, q) {
+          return Math.atan2(p.y - ay, p.x - ax) - Math.atan2(q.y - ay, q.x - ax);
+        });
+        for (var i = 0; i < local.length - 1; i++) {
+          links.push({ a: local[i], b: local[i + 1], color: cs.cat.color, w: 0.9 });
+        }
+      });
+    }
+
+    function setupTip() {
+      tipEl = byId("starmap-tip");
+    }
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = W * DPR;
+      canvas.height = H * DPR;
+      canvas.style.aspectRatio = W + " / " + H;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+
+    function draw(now) {
+      ctx.clearRect(0, 0, W, H);
+
+      // 背景稀疏星尘
+      var rng = seedRandom("dust");
+      var count = 130;
+      for (var i = 0; i < count; i++) {
+        var x = rng() * W, y = rng() * H;
+        var a = 0.12 + rng() * 0.35;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#cfe0ff";
+        ctx.beginPath();
+        ctx.arc(x, y, rng() < 0.1 ? 1.4 : 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // 星座连线
+      links.forEach(function (l) {
+        ctx.strokeStyle = hexA(l.color, 0.22);
+        ctx.lineWidth = l.w;
+        ctx.beginPath();
+        ctx.moveTo(l.a.x, l.a.y);
+        ctx.lineTo(l.b.x, l.b.y);
+        ctx.stroke();
+      });
+
+      // 星点
+      var time = (now - t0) / 1000;
+      stars.forEach(function (s) {
+        var tw = reduced ? 1 : (0.78 + 0.22 * Math.sin(time * s.speed + s.phase));
+        var isHover = hovered === s;
+        var rad = s.r * (isHover ? 1.7 : 1);
+
+        // 光晕
+        var glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rad * 5.5);
+        glow.addColorStop(0, hexA(s.cat.color, 0.55 * tw));
+        glow.addColorStop(1, hexA(s.cat.color, 0));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, rad * 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 星核
+        ctx.fillStyle = isHover ? "#ffffff" : hexA(s.cat.color, 0.95 * tw);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      if (!reduced) raf = window.requestAnimationFrame(draw);
+    }
+
+    function hexA(hex, alpha) {
+      var h = hex.replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var n = parseInt(h, 16);
+      return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + alpha + ")";
+    }
+
+    function toLogical(evt) {
+      var rect = canvas.getBoundingClientRect();
+      var px = (evt.clientX - rect.left) / rect.width * W;
+      var py = (evt.clientY - rect.top) / rect.height * H;
+      return { x: px, y: py };
+    }
+
+    function nearest(p) {
+      var best = null, bestD = 22 * 22;
+      stars.forEach(function (s) {
+        var dx = s.x - p.x, dy = s.y - p.y, d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = s; }
+      });
+      return best;
+    }
+
+    function showTip(s, evt) {
+      if (!tipEl) return;
+      var rect = canvas.getBoundingClientRect();
+      var wrap = canvas.parentNode.getBoundingClientRect();
+      tipEl.hidden = false;
+      tipEl.style.left = ((s.x / W) * rect.width + (rect.left - wrap.left)) + "px";
+      tipEl.style.top = ((s.y / H) * rect.height + (rect.top - wrap.top)) + "px";
+      tipEl.innerHTML =
+        '<div class="tip-name">' + esc(s.repo.full_name) + '</div>' +
+        (s.repo.description ? '<div class="tip-desc">' + esc(s.repo.description) + '</div>' : "") +
+        '<div class="tip-foot">' +
+        '<span class="tip-cat"><i style="background:' + s.cat.color + '"></i>' + esc(s.cat.name) + "</span>" +
+        '<span>★ ' + fmt(s.repo.stars) + "</span>" +
+        (s.repo.language ? "<span>" + esc(s.repo.language) + "</span>" : "") +
+        "</div>";
+    }
+
+    function onMove(evt) {
+      if (!canvas) return;
+      var p = toLogical(evt);
+      var s = nearest(p);
+      if (s !== hovered) {
+        hovered = s;
+        if (s) showTip(s, evt);
+        else if (tipEl) tipEl.hidden = true;
+      } else if (s) {
+        showTip(s, evt);
+      }
+      canvas.style.cursor = s ? "pointer" : "default";
+    }
+
+    function onLeave() {
+      hovered = null;
+      if (tipEl) tipEl.hidden = true;
+    }
+
+    function onClick(evt) {
+      var p = toLogical(evt);
+      var s = nearest(p);
+      if (s && s.repo.html_url) window.open(s.repo.html_url, "_blank", "noopener");
+    }
+
+    return {
+      init: function (stats) {
+        canvas = byId("starmap");
+        if (!canvas) return;
+        ctx = canvas.getContext("2d");
+        reduced = window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setupTip();
+        layout(stats);
+        resize();
+        if (raf) window.cancelAnimationFrame(raf);
+        t0 = performance.now();
+        draw(t0);
+        if (reduced) draw(t0);
+        if (!StarMap._listenersBound) {
+          canvas.addEventListener("mousemove", onMove);
+          canvas.addEventListener("mouseleave", onLeave);
+          canvas.addEventListener("click", onClick);
+          StarMap._listenersBound = true;
+        }
+        if (!StarMap._bound) {
+          window.addEventListener("resize", function () {
+            if (!canvas) return;
+            resize();
+            if (reduced) draw(performance.now());
+          });
+          StarMap._bound = true;
+        }
+      },
+      stars: function () { return stars; },
+      width: W,
+      height: H
+    };
+  })();
+
+  /* ---------- 背景星场 ---------- */
+
+  function initBgStars() {
+    var canvas = byId("bg-stars");
+    if (!canvas) return;
+    var ctx = canvas.getContext("2d");
+    var stars = [];
+    var reduced = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var raf2 = null;
+
+    function build() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = window.innerWidth, h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var rng = seedRandom("bg");
+      var n = Math.round(Math.min(240, (w * h) / 9000));
+      stars = [];
+      for (var i = 0; i < n; i++) {
+        stars.push({
+          x: rng() * w, y: rng() * h,
+          r: rng() * 1.1 + 0.3,
+          a: rng() * 0.5 + 0.15,
+          ph: rng() * Math.PI * 2,
+          sp: 0.4 + rng() * 0.8
+        });
+      }
+    }
+
+    function paint(now) {
+      var w = window.innerWidth, h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      var t = now / 1000;
+      stars.forEach(function (s) {
+        var a = reduced ? s.a : s.a * (0.6 + 0.4 * Math.sin(t * s.sp + s.ph));
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#dbe7ff";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      if (!reduced) raf2 = window.requestAnimationFrame(paint);
+    }
+
+    build();
+    paint(performance.now());
+    if (reduced) paint(performance.now());
+    window.addEventListener("resize", function () {
+      build();
+      if (reduced) paint(performance.now());
+    });
+  }
+
+  /* ---------- 结果页渲染 ---------- */
+
+  var current = null;
+
+  function initials(name) {
+    var s = (name || "?").replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "");
+    return s.slice(0, 1).toUpperCase() || "★";
+  }
+
+  function renderResult(stats) {
+    current = stats;
+    var p = stats.profile;
+
+    // 头像与身份（使用容器，避免重复渲染时元素类型冲突）
+    var avWrap = byId("result-avatar-wrap");
+    if (p.avatar_url) {
+      avWrap.innerHTML = '<img class="avatar" alt="' + esc(p.login) +
+        ' 的头像" src="' + esc(p.avatar_url) + '">';
+    } else {
+      avWrap.innerHTML = '<span class="avatar avatar-fallback">' +
+        esc(initials(p.name || p.login)) + "</span>";
+    }
+    byId("result-name").textContent = p.name || p.login;
+    byId("result-login").textContent = "@" + p.login;
+    byId("result-login").href = p.html_url || ("https://github.com/" + p.login);
+    byId("result-bio").textContent = p.bio || "这位开发者还没有写下自我介绍。";
+
+    var metaBits = [];
+    if (p.company) metaBits.push("🏢 " + p.company);
+    if (p.location) metaBits.push("📍 " + p.location);
+    if (p.public_repos !== undefined) metaBits.push("仓库 " + fmt(p.public_repos));
+    if (p.followers !== undefined) metaBits.push("关注者 " + fmt(p.followers));
+    byId("result-meta").innerHTML = metaBits.map(function (m) {
+      return "<span>" + esc(m) + "</span>";
+    }).join("");
+
+    byId("badge-demo").hidden = !stats.demo;
+    byId("result-link").href = p.html_url || ("https://github.com/" + p.login);
+
+    byId("starmap-title-user").textContent = "· " + (p.login || "") +
+      " · 共 " + stats.count + " 颗星标";
+
+    // 图例
+    var legend = byId("legend");
+    legend.innerHTML = stats.catStats.map(function (cs) {
+      return '<span class="legend-item"><i style="background:' + cs.cat.color + '"></i>' +
+        esc(cs.cat.name) + '<span class="legend-count">' + cs.repos.length + "</span></span>";
+    }).join("");
+
+    // 星图
+    byId("starmap-foot-note").textContent = stats.truncated
+      ? "仅展示最近 " + stats.count + " 颗星标（GitHub 接口分页上限）"
+      : "展示全部 " + stats.count + " 颗星标";
+    StarMap.init(stats);
+
+    // 统计卡片
+    var soul = soulFor(stats);
+    byId("stat-count").textContent = fmt(stats.count);
+    byId("stat-count-note").textContent = stats.categoryCount + " 个星座 · " +
+      stats.langStats.length + " 种语言";
+    byId("stat-stars").textContent = fmt(stats.totalStars);
+    byId("stat-stars-note").textContent = stats.mostStarred
+      ? "最亮的一颗：" + stats.mostStarred.full_name
+      : "暂无数据";
+    byId("stat-focus").textContent = focusIndex(stats);
+    byId("stat-focus-note").textContent = "星标集中于「" + stats.topCat.name + "」";
+
+    // 语言分布
+    var totalLang = stats.langStats.reduce(function (s, l) { return s + l.count; }, 0) || 1;
+    byId("lang-list").innerHTML = stats.langStats.slice(0, 7).map(function (l) {
+      var pct = Math.round(l.count / totalLang * 100);
+      var color = langColor(l.lang);
+      return '<div class="lang-row">' +
+        '<span class="lang-name" title="' + esc(l.lang) + '">' + esc(l.lang) + "</span>" +
+        '<span class="lang-track"><i class="lang-fill" style="width:' + pct +
+        "%;background:" + color + '"></i></span>' +
+        '<span class="lang-pct">' + pct + "%</span></div>";
+    }).join("");
+
+    // 星座统计
+    byId("cat-list").innerHTML = stats.catStats.map(function (cs) {
+      return '<div class="cat-row"><i style="background:' + cs.cat.color + '"></i>' +
+        '<span class="cat-name">' + esc(cs.cat.name) +
+        "<small>" + esc(cs.cat.desc) + "</small></span>" +
+        '<span class="cat-count">' + cs.repos.length + " 颗</span></div>";
+    }).join("");
+
+    // 意外宝藏
+    if (stats.gem) {
+      var g = stats.gem;
+      byId("gem-name").textContent = g.full_name;
+      byId("gem-desc").textContent = g.description ||
+        "一颗被低调收藏的星辰，等待被发现。";
+      byId("gem-foot").innerHTML = "<span>★ " + fmt(g.stars) + "</span>" +
+        "<span>" + esc(g.cat.name) + "</span>" +
+        '<a href="' + esc(g.html_url) + '" target="_blank" rel="noopener">查看仓库 →</a>';
+    }
+
+    // 技术灵魂
+    byId("soul-name").textContent = soul.title;
+    byId("soul-desc").textContent = soul.desc + " 你的星标画像最偏向「" +
+      stats.topCat.name + "」，占比约 " + Math.round(stats.topShare * 100) + "%。";
+    var fi = focusIndex(stats);
+    var fill = document.querySelector(".soul-fill");
+    if (fill) fill.style.width = fi + "%";
+    var soulTop = document.querySelector(".soul-meter-top span:last-child");
+    if (soulTop) soulTop.textContent = fi + " / 100";
+
+    showView("view-result");
+  }
+
+  function langColor(lang) {
+    var map = {
+      Python: "#7cc4ff", JavaScript: "#b79cff", TypeScript: "#8bb8ff",
+      Go: "#63e6be", Rust: "#ff8fb1", C: "#a8e06a", "C++": "#ffc46b",
+      Java: "#ff9d6b", Shell: "#c8d46a", HTML: "#ff7a90", CSS: "#7cd0ff",
+      Ruby: "#ff8f8f", PHP: "#a78bfa", Swift: "#ffb38f", Kotlin: "#b0a0ff"
+    };
+    return map[lang] || "#8b97b8";
+  }
+
+  /* ---------- 分享卡片 ---------- */
+
+  function drawShareCard(stats, cb) {
+    var W = 1200, H = 630;
+    var c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+
+    // 背景
+    var bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, "#070a1c");
+    bg.addColorStop(0.5, "#0a0d22");
+    bg.addColorStop(1, "#0d0a22");
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+
+    // 星尘
+    var rng = seedRandom("share|" + (stats.profile.login || ""));
+    for (var i = 0; i < 220; i++) {
+      g.globalAlpha = 0.1 + rng() * 0.5;
+      g.fillStyle = "#dbe7ff";
+      g.beginPath();
+      g.arc(rng() * W, rng() * H, rng() < 0.12 ? 1.5 : 0.8, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+
+    // 星座缩略图（右侧）
+    var regionX = 720, regionY = 120, regionW = 420, regionH = 400;
+    var stars = StarMap.stars();
+    if (stars.length) {
+      var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      stars.forEach(function (s) {
+        minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+        minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y);
+      });
+      var pad = 30;
+      var sc = Math.min((regionW - pad * 2) / (maxX - minX || 1),
+        (regionH - pad * 2) / (maxY - minY || 1));
+      function tx(x) { return regionX + pad + (x - minX) * sc; }
+      function ty(y) { return regionY + pad + (y - minY) * sc; }
+
+      var links = [];
+      for (var a = 0; a < stars.length; a++) {
+        for (var b = a + 1; b < stars.length; b++) {
+          if (stars[a].cat === stars[b].cat &&
+            Math.hypot(stars[a].x - stars[b].x, stars[a].y - stars[b].y) < 130) {
+            links.push([stars[a], stars[b]]);
+          }
+        }
+      }
+      g.lineWidth = 1;
+      links.forEach(function (l) {
+        g.strokeStyle = hexA2(l[0].cat.color, 0.18);
+        g.beginPath();
+        g.moveTo(tx(l[0].x), ty(l[0].y));
+        g.lineTo(tx(l[1].x), ty(l[1].y));
+        g.stroke();
+      });
+      stars.forEach(function (s) {
+        var rad = 1.4 + (s.r - 1.6) * 0.7;
+        var glow = g.createRadialGradient(tx(s.x), ty(s.y), 0, tx(s.x), ty(s.y), rad * 5);
+        glow.addColorStop(0, hexA2(s.cat.color, 0.5));
+        glow.addColorStop(1, hexA2(s.cat.color, 0));
+        g.fillStyle = glow;
+        g.beginPath(); g.arc(tx(s.x), ty(s.y), rad * 5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = hexA2(s.cat.color, 0.95);
+        g.beginPath(); g.arc(tx(s.x), ty(s.y), rad, 0, Math.PI * 2); g.fill();
+      });
+    }
+
+    // 左侧文字
+    g.fillStyle = "#7cc4ff";
+    g.font = "600 20px 'Space Grotesk Variable', system-ui, sans-serif";
+    g.fillText("STARSCOPE · 星象图", 70, 92);
+
+    var name = stats.profile.name || stats.profile.login;
+    g.fillStyle = "#ffffff";
+    g.font = "700 62px 'Space Grotesk Variable', system-ui, sans-serif";
+    var displayName = name.length > 14 ? name.slice(0, 14) + "…" : name;
+    g.fillText(displayName, 70, 190);
+
+    g.fillStyle = "#8b97b8";
+    g.font = "400 26px 'JetBrains Mono Variable', monospace";
+    g.fillText("@" + stats.profile.login, 70, 232);
+
+    // 灵魂标签
+    var soul = soulFor(stats);
+    g.fillStyle = "#b79cff";
+    g.font = "600 30px 'Space Grotesk Variable', system-ui, sans-serif";
+    g.fillText(soul.title, 70, 320);
+    g.fillStyle = "#8b97b8";
+    g.font = "400 20px 'Space Grotesk Variable', system-ui, sans-serif";
+    var dline = soul.desc.length > 22 ? soul.desc.slice(0, 22) + "…" : soul.desc;
+    g.fillText(dline, 70, 356);
+
+    // 数据行
+    var metrics = [
+      ["星标", fmt(stats.count)],
+      ["总星数", fmt(stats.totalStars)],
+      ["星座", String(stats.categoryCount)]
+    ];
+    metrics.forEach(function (m, i) {
+      var x = 70 + i * 200;
+      g.fillStyle = "#7cc4ff";
+      g.font = "700 40px 'JetBrains Mono Variable', monospace";
+      g.fillText(m[1], x, 460);
+      g.fillStyle = "#5c6784";
+      g.font = "400 18px 'Space Grotesk Variable', system-ui, sans-serif";
+      g.fillText(m[0], x, 490);
+    });
+
+    // 顶分类色带
+    var barX = 70, barY = 536, barW = 620, barH = 8;
+    var acc = 0;
+    stats.catStats.forEach(function (cs) {
+      var w = (cs.repos.length / (stats.count || 1)) * barW;
+      g.fillStyle = cs.cat.color;
+      g.fillRect(barX + acc, barY, w, barH);
+      acc += w;
+    });
+
+    // 页脚
+    g.fillStyle = "#5c6784";
+    g.font = "400 17px 'JetBrains Mono Variable', monospace";
+    g.fillText("starscope · 你的 GitHub 星象图", 70, 588);
+
+    cb(c);
+  }
+
+  function hexA2(hex, alpha) {
+    var h = hex.replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + alpha + ")";
+  }
+
+  function openShare() {
+    if (!current) return;
+    drawShareCard(current, function (canvas) {
+      var host = byId("share-preview");
+      host.innerHTML = "";
+      host.appendChild(canvas);
+      canvas.style.width = "100%";
+      canvas.style.height = "auto";
+      byId("share-modal").hidden = false;
+      byId("share-filename").textContent =
+        "starscope-" + current.profile.login + ".png";
+    });
+  }
+
+  function downloadShare() {
+    var canvas = byId("share-preview").querySelector("canvas");
+    if (!canvas) return;
+    try {
+      var a = document.createElement("a");
+      a.download = "starscope-" + current.profile.login + ".png";
+      a.href = canvas.toDataURL("image/png");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast("分享卡片已开始下载");
+    } catch (e) {
+      toast("当前环境不支持直接下载，请右键图片另存");
+    }
+  }
+
+  /* ---------- Toast ---------- */
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = byId("toast");
+    el.textContent = msg;
+    el.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 2600);
+  }
+
+  /* ---------- 加载流程 ---------- */
+
+  var LOADING_LINES = [
+    "正在扫描你的技术行星带…",
+    "正在为每一颗星标定位…",
+    "正在连线，绘制星座…",
+    "正在寻找那颗被低估的星…"
+  ];
+
+  var loadingTimer = null;
+  function startLoading(username, demo) {
+    showView("view-loading");
+    byId("loading-user").textContent = demo
+      ? "演示模式 · octo-explorer"
+      : "github.com/" + username;
+    var i = 0;
+    var status = byId("loading-status");
+    status.innerHTML = '<span class="loading-text"></span><span class="caret"></span>';
+    var textEl = status.querySelector(".loading-text");
+    textEl.textContent = LOADING_LINES[0];
+    if (loadingTimer) clearInterval(loadingTimer);
+    loadingTimer = setInterval(function () {
+      i = (i + 1) % LOADING_LINES.length;
+      textEl.textContent = LOADING_LINES[i];
+    }, 1100);
+  }
+
+  function stopLoading() {
+    if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+  }
+
+  function errorMessage(err) {
+    switch (err && err.code) {
+      case "notfound":
+        return {
+          title: "没有找到这位开发者",
+          body: "请检查用户名是否拼写正确。GitHub 用户名区分大小写，但通常不敏感。",
+          detail: "HTTP 404 · " + (err.message || "")
+        };
+      case "ratelimit":
+        return {
+          title: "GitHub 接口繁忙",
+          body: "未登录状态下每小时仅能发起 60 次请求。你可以稍后重试，在顶部设置中填入自己的 GitHub Token 以提升额度，或先用演示模式看看效果。",
+          detail: "HTTP 403/429 · rate limit exceeded"
+        };
+      case "network":
+        return {
+          title: "网络连接失败",
+          body: "无法访问 GitHub 接口。请检查网络连接后重试，或先用演示模式浏览效果。",
+          detail: String(err.message || err)
+        };
+      default:
+        return {
+          title: "出了一点小问题",
+          body: "获取数据时发生意外错误。你可以重试，或先体验演示模式。",
+          detail: err && err.message ? esc(err.message) : "unknown error"
+        };
+    }
+  }
+
+  function showError(err) {
+    stopLoading();
+    var info = errorMessage(err);
+    byId("error-title").textContent = info.title;
+    byId("error-body").textContent = info.body;
+    byId("error-detail").textContent = info.detail;
+    showView("view-error");
+  }
+
+  function run(username, opts) {
+    opts = opts || {};
+    username = (username || "").trim().replace(/^@/, "");
+    if (!username) {
+      toast("请输入一个 GitHub 用户名");
+      return;
+    }
+
+    // 缓存：24 小时内不重复请求
+    var cacheKey = "starscope_cache_" + username.toLowerCase();
+    if (!opts.force) {
+      var cached = storeGet(cacheKey);
+      if (cached) {
+        try {
+          var parsed = JSON.parse(cached);
+          if (parsed && parsed.t && (Date.now() - parsed.t) < 86400000 && parsed.data) {
+            startLoading(username, parsed.data.demo);
+            setTimeout(function () {
+              stopLoading();
+              renderResult(computeStats(parsed.data));
+            }, 700);
+            setUrlUser(username);
+            return;
+          }
+        } catch (e) { /* 缓存损坏则忽略 */ }
+      }
+    }
+
+    startLoading(username, false);
+    var startedAt = Date.now();
+
+    loadUser(username).then(function (data) {
+      var wait = Math.max(0, 1400 - (Date.now() - startedAt));
+      setTimeout(function () {
+        stopLoading();
+        storeSet(cacheKey, JSON.stringify({ t: Date.now(), data: data }));
+        renderResult(computeStats(data));
+        setUrlUser(username);
+      }, wait);
+    }).catch(function (err) {
+      if (err && err.code === undefined && !navigator.onLine) {
+        err = apiError("network", "offline");
+      }
+      if (err && err.code === "http") {
+        // 兜底为网络类错误展示
+        err = apiError("network", err.message);
+      }
+      showError(err);
+    });
+  }
+
+  function runDemo() {
+    startLoading("octo-explorer", true);
+    setTimeout(function () {
+      stopLoading();
+      renderResult(computeStats(buildDemoData()));
+      setUrlUser("");
+    }, 1500);
+  }
+
+  /* ---------- URL 状态 ---------- */
+
+  function setUrlUser(username) {
+    try {
+      var url = new URL(window.location.href);
+      if (username) url.searchParams.set("u", username);
+      else url.searchParams.delete("u");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* URL API 不可用时忽略 */ }
+  }
+
+  function urlUser() {
+    try {
+      var url = new URL(window.location.href);
+      return url.searchParams.get("u") || "";
+    } catch (e) { return ""; }
+  }
+
+  /* ---------- Token 设置 ---------- */
+
+  function openSettings() {
+    var existing = storeGet("starscope_token") || "";
+    byId("token-input").value = existing;
+    byId("settings-modal").hidden = false;
+  }
+
+  function saveToken() {
+    var val = byId("token-input").value.trim();
+    if (val) storeSet("starscope_token", val);
+    else { try { store.removeItem("starscope_token"); } catch (e) {} }
+    byId("settings-modal").hidden = true;
+    toast(val ? "已保存 Token，额度已提升" : "已清除 Token");
+  }
+
+  /* ---------- 事件绑定 ---------- */
+
+  function bind() {
+    byId("search-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      run(byId("search-input").value);
+    });
+    byId("demo-btn").addEventListener("click", runDemo);
+    byId("error-demo-btn").addEventListener("click", runDemo);
+    byId("error-retry-btn").addEventListener("click", function () {
+      var u = urlUser() || byId("search-input").value;
+      if (u) run(u, { force: true });
+      else showView("view-intro");
+    });
+    byId("again-btn").addEventListener("click", function () {
+      byId("search-input").value = "";
+      setUrlUser("");
+      showView("view-intro");
+      byId("search-input").focus();
+    });
+    byId("share-btn").addEventListener("click", openShare);
+    byId("share-download").addEventListener("click", downloadShare);
+    byId("share-close").addEventListener("click", function () {
+      byId("share-modal").hidden = true;
+    });
+    byId("settings-btn").addEventListener("click", openSettings);
+    byId("settings-close").addEventListener("click", function () {
+      byId("settings-modal").hidden = true;
+    });
+    byId("settings-save").addEventListener("click", saveToken);
+
+    // 弹窗遮罩点击关闭
+    ["share-modal", "settings-modal"].forEach(function (id) {
+      byId(id).addEventListener("click", function (e) {
+        if (e.target === byId(id)) byId(id).hidden = true;
+      });
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        byId("share-modal").hidden = true;
+        byId("settings-modal").hidden = true;
+      }
+      if (e.key === "/" && byId("view-intro").hidden === false &&
+        document.activeElement !== byId("search-input")) {
+        e.preventDefault();
+        byId("search-input").focus();
+      }
+    });
+  }
+
+  /* ---------- 初始化 ---------- */
+
+  function init() {
+    bind();
+    initBgStars();
+    var u = urlUser();
+    if (u) {
+      byId("search-input").value = u;
+      run(u);
+    } else {
+      showView("view-intro");
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+
+</script>
+</body>
+</html>
