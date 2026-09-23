@@ -329,7 +329,7 @@
   var StarMap = (function () {
     var canvas, ctx, W = 1000, H = 620, DPR = 1;
     var stars = [], links = [], cats = [];
-    var hovered = null, raf = null, t0 = 0, reduced = false;
+    var hovered = null, raf = null, t0 = 0, reduced = false, activeCat = null;
     var tipEl;
 
     function layout(stats) {
@@ -406,7 +406,8 @@
 
       // 星座连线
       links.forEach(function (l) {
-        ctx.strokeStyle = hexA(l.color, 0.22);
+        var ldim = (activeCat && l.a.cat.id !== activeCat) ? 0.15 : 1;
+        ctx.strokeStyle = hexA(l.color, 0.22 * ldim);
         ctx.lineWidth = l.w;
         ctx.beginPath();
         ctx.moveTo(l.a.x, l.a.y);
@@ -420,10 +421,11 @@
         var tw = reduced ? 1 : (0.78 + 0.22 * Math.sin(time * s.speed + s.phase));
         var isHover = hovered === s;
         var rad = s.r * (isHover ? 1.7 : 1);
+        var dim = (activeCat && s.cat.id !== activeCat) ? 0.16 : 1;
 
         // 光晕
         var glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rad * 5.5);
-        glow.addColorStop(0, hexA(s.cat.color, 0.55 * tw));
+        glow.addColorStop(0, hexA(s.cat.color, 0.55 * tw * dim));
         glow.addColorStop(1, hexA(s.cat.color, 0));
         ctx.fillStyle = glow;
         ctx.beginPath();
@@ -431,7 +433,7 @@
         ctx.fill();
 
         // 星核
-        ctx.fillStyle = isHover ? "#ffffff" : hexA(s.cat.color, 0.95 * tw);
+        ctx.fillStyle = isHover ? "#ffffff" : hexA(s.cat.color, 0.95 * tw * dim);
         ctx.beginPath();
         ctx.arc(s.x, s.y, rad, 0, Math.PI * 2);
         ctx.fill();
@@ -512,6 +514,7 @@
         ctx = canvas.getContext("2d");
         reduced = window.matchMedia &&
           window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        activeCat = null;
         setupTip();
         layout(stats);
         resize();
@@ -533,6 +536,10 @@
           });
           StarMap._bound = true;
         }
+      },
+      setFilter: function (id) {
+        activeCat = id || null;
+        if (reduced) draw(performance.now());
       },
       stars: function () { return stars; },
       width: W,
@@ -607,6 +614,7 @@
 
   function renderResult(stats) {
     current = stats;
+    activeFilter = null;
     var p = stats.profile;
 
     // 头像与身份（使用容器，避免重复渲染时元素类型冲突）
@@ -624,8 +632,8 @@
     byId("result-bio").textContent = p.bio || "这位开发者还没有写下自我介绍。";
 
     var metaBits = [];
-    if (p.company) metaBits.push("🏢 " + p.company);
-    if (p.location) metaBits.push("📍 " + p.location);
+    if (p.company) metaBits.push("公司 · " + p.company);
+    if (p.location) metaBits.push("位置 · " + p.location);
     if (p.public_repos !== undefined) metaBits.push("仓库 " + fmt(p.public_repos));
     if (p.followers !== undefined) metaBits.push("关注者 " + fmt(p.followers));
     byId("result-meta").innerHTML = metaBits.map(function (m) {
@@ -638,10 +646,11 @@
     byId("starmap-title-user").textContent = "· " + (p.login || "") +
       " · 共 " + stats.count + " 颗星标";
 
-    // 图例
+    // 图例（可点击筛选星座）
     var legend = byId("legend");
     legend.innerHTML = stats.catStats.map(function (cs) {
-      return '<span class="legend-item"><i style="background:' + cs.cat.color + '"></i>' +
+      return '<span class="legend-item" data-cat="' + cs.cat.id + '" role="button" tabindex="0" ' +
+        'aria-label="只看' + esc(cs.cat.name) + '"><i style="background:' + cs.cat.color + '"></i>' +
         esc(cs.cat.name) + '<span class="legend-count">' + cs.repos.length + "</span></span>";
     }).join("");
 
@@ -665,23 +674,28 @@
 
     // 语言分布
     var totalLang = stats.langStats.reduce(function (s, l) { return s + l.count; }, 0) || 1;
-    byId("lang-list").innerHTML = stats.langStats.slice(0, 7).map(function (l) {
+    var topLangs = stats.langStats.slice(0, 7);
+    var langHtml = topLangs.map(function (l) {
       var pct = Math.round(l.count / totalLang * 100);
-      var color = langColor(l.lang);
       return '<div class="lang-row">' +
         '<span class="lang-name" title="' + esc(l.lang) + '">' + esc(l.lang) + "</span>" +
         '<span class="lang-track"><i class="lang-fill" style="width:' + pct +
-        "%;background:" + color + '"></i></span>' +
+        "%;background:" + langColor(l.lang) + '"></i></span>' +
         '<span class="lang-pct">' + pct + "%</span></div>";
     }).join("");
+    if (stats.langStats.length > 7) {
+      langHtml += '<div class="lang-more">另有 ' + (stats.langStats.length - 7) +
+        " 种语言未展示</div>";
+    }
+    byId("lang-list").innerHTML = langHtml || '<p class="empty-note">暂无语言数据。</p>';
 
     // 星座统计
-    byId("cat-list").innerHTML = stats.catStats.map(function (cs) {
+    byId("cat-list").innerHTML = (stats.catStats.map(function (cs) {
       return '<div class="cat-row"><i style="background:' + cs.cat.color + '"></i>' +
         '<span class="cat-name">' + esc(cs.cat.name) +
         "<small>" + esc(cs.cat.desc) + "</small></span>" +
         '<span class="cat-count">' + cs.repos.length + " 颗</span></div>";
-    }).join("");
+    }).join("")) || '<p class="empty-note">这位开发者还没有公开星标。</p>';
 
     // 意外宝藏
     if (stats.gem) {
@@ -715,6 +729,73 @@
       Ruby: "#ff8f8f", PHP: "#a78bfa", Swift: "#ffb38f", Kotlin: "#b0a0ff"
     };
     return map[lang] || "#8b97b8";
+  }
+
+  /* ---------- 图例筛选与分享链接 ---------- */
+
+  var activeFilter = null;
+
+  function applyLegendState() {
+    var items = document.querySelectorAll("#legend .legend-item");
+    for (var i = 0; i < items.length; i++) {
+      var id = items[i].getAttribute("data-cat");
+      items[i].classList.toggle("active", activeFilter === id);
+      items[i].classList.toggle("dim", !!activeFilter && activeFilter !== id);
+    }
+  }
+
+  function defaultFootNote() {
+    if (!current) return "";
+    return current.truncated
+      ? "仅展示最近 " + current.count + " 颗星标（GitHub 接口分页上限）"
+      : "展示全部 " + current.count + " 颗星标";
+  }
+
+  function toggleLegendFilter(id) {
+    activeFilter = (activeFilter === id) ? null : id;
+    StarMap.setFilter(activeFilter);
+    applyLegendState();
+    var note = byId("starmap-foot-note");
+    if (activeFilter && current) {
+      var hit = current.catStats.filter(function (x) {
+        return x.cat.id === activeFilter;
+      })[0];
+      note.textContent = hit
+        ? "正在查看「" + hit.cat.name + "」· " + hit.repos.length + " 颗 · 再次点击取消"
+        : defaultFootNote();
+    } else {
+      note.textContent = defaultFootNote();
+    }
+  }
+
+  function copyShareLink() {
+    if (!current) return;
+    var base = window.location.origin + window.location.pathname;
+    var link = current.demo ? base : base + "?u=" + encodeURIComponent(current.profile.login);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function () {
+        toast("分享链接已复制：" + link);
+      }, function () { fallbackCopy(link); });
+    } else {
+      fallbackCopy(link);
+    }
+  }
+
+  function fallbackCopy(text) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      toast("分享链接已复制");
+    } catch (e) {
+      toast("复制失败，请手动复制地址栏链接");
+    }
   }
 
   /* ---------- 分享卡片 ---------- */
@@ -950,7 +1031,7 @@
         return {
           title: "出了一点小问题",
           body: "获取数据时发生意外错误。你可以重试，或先体验演示模式。",
-          detail: err && err.message ? esc(err.message) : "unknown error"
+          detail: err && err.message ? err.message : "unknown error"
         };
     }
   }
@@ -1079,6 +1160,17 @@
       byId("search-input").focus();
     });
     byId("share-btn").addEventListener("click", openShare);
+    byId("copy-link-btn").addEventListener("click", copyShareLink);
+    var legendEl = byId("legend");
+    legendEl.addEventListener("click", function (e) {
+      var item = e.target && e.target.closest ? e.target.closest(".legend-item") : null;
+      if (item) toggleLegendFilter(item.getAttribute("data-cat"));
+    });
+    legendEl.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      var item = e.target && e.target.closest ? e.target.closest(".legend-item") : null;
+      if (item) { e.preventDefault(); toggleLegendFilter(item.getAttribute("data-cat")); }
+    });
     byId("share-download").addEventListener("click", downloadShare);
     byId("share-close").addEventListener("click", function () {
       byId("share-modal").hidden = true;
